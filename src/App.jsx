@@ -1,6 +1,9 @@
-import { useState } from "react";
-import "./App.css";
+import React, { useState, useRef } from "react";
 import { _GSPS2PDF } from "./lib/background.js";
+import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/card.jsx";
+import { Button } from "./components/ui/button.jsx";
+import { Input } from "./components/ui/input.jsx";
+import { Upload, Download, X, FileText } from "lucide-react";
 
 function loadPDFData(response, filename) {
   return new Promise((resolve, reject) => {
@@ -17,10 +20,12 @@ function loadPDFData(response, filename) {
   });
 }
 
-function App() {
+export default function App() {
   const [state, setState] = useState("init");
   const [file, setFile] = useState(undefined);
   const [downloadLink, setDownloadLink] = useState(undefined);
+  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
 
   function compressPDF(pdf, filename) {
     const dataObject = { psDataURL: pdf };
@@ -39,124 +44,133 @@ function App() {
   }
 
   const changeHandler = (event) => {
-    const file = event.target.files[0];
-    const url = window.URL.createObjectURL(file);
-    setFile({ filename: file.name, url });
-    setState("selected");
+    const selectedFile = event.target.files[0];
+    if (selectedFile && selectedFile.type === "application/pdf") {
+      const url = window.URL.createObjectURL(selectedFile);
+      setFile({ filename: selectedFile.name, url });
+      setState("selected");
+      setError(null);
+    } else {
+      setError("Please select a valid PDF file.");
+    }
   };
 
   const onSubmit = (event) => {
     event.preventDefault();
-    const { filename, url } = file;
-    compressPDF(url, filename);
-    setState("loading");
-    return false;
+    if (file) {
+      const { filename, url } = file;
+      compressPDF(url, filename);
+      setState("loading");
+    }
   };
 
-  let minFileName =
-    file && file.filename && file.filename.replace(".pdf", "-min.pdf");
+  const removeFile = () => {
+    setFile(undefined);
+    setState("init");
+    setDownloadLink(undefined);
+    setError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  let minFileName = file && file.filename && file.filename.replace(".pdf", "-min.pdf");
+
   return (
-    <>
-      <h1>Free Browser side PDF-Compressor</h1>
-      <p>
-        The best tool I know to compress PDF is{" "}
-        <a target={"_blank"} href={"https://ghostscript.com/"}>
-          Ghostscript
-        </a>{" "}
-        but this was not running in the browser. Until{" "}
-        <a target={"_blank"} href={"https://github.com/ochachacha/ps-wasm"}>
-          Ochachacha
-        </a>{" "}
-        ported the lib in{" "}
-        <a target={"_blank"} href={"https://webassembly.org/"}>
-          Webassembly
-        </a>
-        .
-      </p>
-      <p>
-        Based on his amazing work, I built this{" "}
-        <a
-          href={
-            "https://github.com/laurentmmeyer/ghostscript-pdf-compress.wasm"
-          }
-          target={"_blank"}
-        >
-          demo
-        </a>
-        . It's running on Vite and React. It imports the WASM on the fly when
-        you want compress a PDF.
-      </p>
-      <p>
-        Be aware that the Webassembly binary is weighting <b>18MB</b>.
-      </p>
-      <p>
-        <i>
-          Secure and private by design: the data never leaves your computer.
-        </i>
-      </p>
-      {state !== "loading" && state !== "toBeDownloaded" && (
-        <form onSubmit={onSubmit}>
-          <input
-            type="file"
-            accept={"application/pdf"}
-            name="file"
-            onChange={changeHandler}
-            id={"file"}
-          />
-          <div className={"label padded-button"}>
-            <label htmlFor={"file"}>
-              {!file || !file.filename
-                ? `Choose PDF to compress`
-                : file.filename}
-            </label>
-          </div>
-          {state === "selected" && (
-            <div className={"success-button padded-button padding-top"}>
-              <input
-                className={"button"}
-                type="submit"
-                value={"🚀 Compress this PDF in the browser! 🚀"}
+    <Card className="w-full max-w-xl mx-auto my-8">
+      <CardHeader className="pb-6 w-full">
+        <div className="flex items-center space-x-4">
+          <FileText className="w-16 h-16 text-primary" />
+          <CardTitle className="text-2xl font-bold">
+            PDF Compressor
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-10 w-full">
+        {/* File upload section */}
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold mb-4">Upload a PDF</h2>
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex-1 flex flex-col gap-4">
+              <p className="text-sm">
+                Upload a PDF file to compress.
+              </p>
+              <div className="w-full h-40 bg-gray-100 rounded-lg flex-1 flex items-center justify-center min-h-40">
+                {file ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <FileText className="h-16 w-16 text-primary" />
+                    <p className="text-sm mt-2">{file.filename}</p>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={removeFile}
+                      className="absolute top-2 right-2 z-10 rounded-full bg-background border border-input h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <FileText className="h-16 w-16 text-gray-400" />
+                )}
+              </div>
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full text-sm"
+                variant="outline"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Choose PDF
+              </Button>
+              <Input
+                id="pdf-upload"
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={changeHandler}
+                className="hidden"
               />
             </div>
-          )}
-        </form>
-      )}
-      {state === "loading" && "Loading...."}
-      {state === "toBeDownloaded" && (
-        <>
-          <div className={"success-button padded-button"}>
-            <a href={downloadLink} download={minFileName}>
-              {`📄 Download ${minFileName} 📄`}
-            </a>
+            {downloadLink && (
+              <div className="flex-1 flex flex-col gap-4">
+                <h3 className="text-lg font-medium">Compressed PDF</h3>
+                <div className="relative w-full h-40 flex-1 flex items-center justify-center bg-gray-100 rounded-lg">
+                  <FileText className="h-16 w-16 text-primary" />
+                  <p className="text-sm mt-2">{minFileName}</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = downloadLink;
+                    link.download = minFileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="w-full text-sm"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Download Compressed PDF
+                </Button>
+              </div>
+            )}
           </div>
-          <div className={"blue padded-button padding-top"}>
-            <a href={"./"}>{`🔁 Compress another PDF 🔁`}</a>
+        </div>
+
+        <div className="flex justify-center">
+          <Button
+            className="px-8 py-4 text-lg font-semibold"
+            disabled={!file || state === "loading"}
+            onClick={onSubmit}
+          >
+            {state === "loading" ? "Compressing..." : "Compress PDF"}
+          </Button>
+        </div>
+
+        {error && (
+          <div className="mt-6 text-red-500">
+            <p>{error}</p>
           </div>
-        </>
-      )}
-      <p>
-        Everything is open-source and you can contribute{" "}
-        <a
-          href={
-            "https://github.com/laurentmmeyer/ghostscript-pdf-compress.wasm"
-          }
-          target={"_blank"}
-        >
-          here
-        </a>
-        .
-      </p>
-      <br />
-      <p>
-        <i>This website uses no tracking, no cookies, no adtech.</i>
-      </p>
-      <p>
-        <a target={"_blank"} href={"https://meyer-laurent.com"}>
-          About me
-        </a>
-      </p>
-    </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
-
-export default App;
